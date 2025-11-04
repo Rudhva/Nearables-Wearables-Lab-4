@@ -4,16 +4,18 @@ float[] fsrTargets = new float[4];
 
 // Fine-tuned offsets for better alignment on the flipped right foot
 // Indexes: 0=Big Toe, 1=Ball (lateral), 2=Medial midfoot, 3=Heel
-float[] xOffsets = {70, 160, 100, 110};   // medial midfoot moved left
-float[] yOffsets = {170, 210, 290, 470};  // lateral + midfoot slightly up
+// float[] xOffsets = {70, 160, 100, 110};   // medial midfoot moved left
+// float[] yOffsets = {170, 210, 290, 470};  // lateral + midfoot slightly up
 
+float[] xOffsets = {160, 80, 70, 115};
+float[] yOffsets = {180, 100, 240, 470};
 String[] labels = {"Big Toe", "Ball", "Midfoot", "Heel"};
 
 float scaleFactor;
 float imgWidth, imgHeight;
 float imgX = 200, imgY = 100;
 
-void setup() {
+void heatMapSetup() {
   size(1200, 800);
   smooth(8);
   footImg = loadImage("foot.jpg");
@@ -30,19 +32,15 @@ void setup() {
   textSize(16);
 }
 
-void draw() {
+void heatMapDraw() {
   background(255);
   image(footImg, imgX, imgY, imgWidth, imgHeight);
 
-  for (int i = 0; i < fsrValues.length; i++) {
-    fsrValues[i] += (fsrTargets[i] - fsrValues[i]) * 0.1;
-  }
-
-  if (frameCount % 60 == 0) {
-    for (int i = 0; i < fsrTargets.length; i++) {
-      fsrTargets[i] = random(0, 1023);
-    }
-  }
+  // Update fsrValues with real serial readings
+  fsrValues[0] = lf;   // Big Toe / LF
+  fsrValues[1] = mf;   // Ball / MF
+  fsrValues[2] = mm;   // Midfoot / MM
+  fsrValues[3] = heel; // Heel
 
   noStroke();
 
@@ -59,6 +57,7 @@ void draw() {
 
   drawBars();
 }
+
 
 void drawSoftSpot(float x, float y, float radius, float val) {
   int layers = 10;

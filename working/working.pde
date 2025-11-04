@@ -1,9 +1,11 @@
 void setup() {
   size(1200, 800);
-  heatMapSetUp();
+  heatMapSetup();
+  setupSerial();
 }
 
 void draw() {
   background(255);
   heatMapDraw();
+  readSerial();
 }
