@@ -1,73 +1,86 @@
 PImage footImg;
-float[] fsrValues = new float[4]; 
-float[] fsrTargets = new float[4]; 
+float[] fsrValues = new float[4];
+float[] fsrTargets = new float[4];
 
-// Original offsets from top-left of the image
-float[] xOffsets = {170, 45, 150, 90};
-float[] yOffsets = {170, 200, 265, 470};
+// Fine-tuned offsets for better alignment on the flipped right foot
+// Indexes: 0=Big Toe, 1=Ball (lateral), 2=Medial midfoot, 3=Heel
+float[] xOffsets = {70, 160, 100, 110};   // medial midfoot moved left
+float[] yOffsets = {170, 210, 290, 470};  // lateral + midfoot slightly up
 
-// Labels for left foot
-String[] labels = {"LF", "MF", "MM", "Heel"};
+String[] labels = {"Big Toe", "Ball", "Midfoot", "Heel"};
 
-// Scaling factors and position
 float scaleFactor;
 float imgWidth, imgHeight;
 float imgX = 200, imgY = 100;
 
-void heatMapSetUp() {
-  footImg = loadImage("foot.jpg"); // put in 'data' folder
+void setup() {
+  size(1200, 800);
+  smooth(8);
+  footImg = loadImage("foot.jpg");
 
-  // Scale foot image to fill more of the window
   scaleFactor = 600.0 / footImg.height;
   imgWidth = footImg.width * scaleFactor;
   imgHeight = footImg.height * scaleFactor;
 
-  // Initialize FSR values and targets
   for (int i = 0; i < fsrValues.length; i++) {
     fsrValues[i] = random(0, 1023);
     fsrTargets[i] = fsrValues[i];
   }
 
-  noStroke();
   textSize(16);
-  fill(0);
 }
 
-void heatMapDraw() {
+void draw() {
+  background(255);
   image(footImg, imgX, imgY, imgWidth, imgHeight);
 
-  // Gradually update fsrValues
   for (int i = 0; i < fsrValues.length; i++) {
-    fsrValues[i] += (fsrTargets[i] - fsrValues[i]) * 0.05;
+    fsrValues[i] += (fsrTargets[i] - fsrValues[i]) * 0.1;
   }
 
-  // Occasionally pick new target every 60 frames (~1 sec)
   if (frameCount % 60 == 0) {
     for (int i = 0; i < fsrTargets.length; i++) {
       fsrTargets[i] = random(0, 1023);
     }
   }
 
-  // Draw FSR heatmap circles and labels
+  noStroke();
+
   for (int i = 0; i < fsrValues.length; i++) {
     float x = imgX + xOffsets[i] * scaleFactor;
     float y = imgY + yOffsets[i] * scaleFactor;
 
-    // Flip horizontally for left foot
-    x = imgX + imgWidth - (x - imgX);
+    float val = fsrValues[i];
+    float radius = map(val, 0, 1023, 40, 150);
+    radius = constrain(radius, 40, 120);
 
-    float radius = map(fsrValues[i], 0, 1023, 20, 60); // smaller bubbles
-    if (fsrValues[i] < 0.6 * 1023) fill(0, 150, 255, 180);
-    else if (fsrValues[i] < 0.8 * 1023) fill(255, 200, 0, 180);
-    else fill(255, 0, 0, 180);
-    ellipse(x, y, radius, radius);
-
-    // Draw label to the right of the dot
-    fill(0);
-    text(labels[i], x + radius/2 + 5, y + 5);
+    drawSoftSpot(x, y, radius, val);
   }
 
-  // Draw bar graphs with matching labels
+  drawBars();
+}
+
+void drawSoftSpot(float x, float y, float radius, float val) {
+  int layers = 10;
+  int c = heatColor(val);
+  for (int i = layers; i > 0; i--) {
+    float r = radius * i / layers;
+    float alpha = map(i, 0, layers, 0, 100);
+    fill(red(c), green(c), blue(c), alpha);
+    ellipse(x, y, r, r);
+  }
+}
+
+int heatColor(float v) {
+  float n = constrain(v / 1023.0, 0, 1);
+  color c1 = color(0, 0, 255);
+  color c2 = color(255, 255, 0);
+  color c3 = color(255, 0, 0);
+  if (n < 0.5) return lerpColor(c1, c2, n * 2);
+  else return lerpColor(c2, c3, (n - 0.5) * 2);
+}
+
+void drawBars() {
   for (int i = 0; i < fsrValues.length; i++) {
     fill(100, 200, 255);
     float barHeight = map(fsrValues[i], 0, 1023, 0, 200);
