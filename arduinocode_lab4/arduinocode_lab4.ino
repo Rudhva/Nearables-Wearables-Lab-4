@@ -40,15 +40,33 @@ void setup() {
 
 void loop() {
   // Read 4 FSR analog pins
-  for (int i = 0; i < 4; i++) {
-    fsrValues[i] = analogRead(fsrPins[i]);
-    
-    // Map FSR value (0-1023) to LED brightness (0-255)
-    int ledBrightness = map(fsrValues[i], 0, 1023, 0, 255);
-    
-    // Set LED brightness
-    analogWrite(ledPins[i], ledBrightness);
-  }
+ // Read FSRs and set LED brightness individually
+
+// FSR 0 → LED D3 (max 200 to avoid super brightness)
+fsrValues[0] = analogRead(fsrPins[0]);
+int ledBrightness0 = 0;
+if (fsrValues[0]<15) {
+  ledBrightness0 = 0;
+
+} 
+else ledBrightness0 = map(fsrValues[0], 0, 1023, 0, 200);
+
+analogWrite(ledPins[0], ledBrightness0);
+
+// FSR 1 → LED D5 (max 245)
+fsrValues[1] = analogRead(fsrPins[1]);
+int ledBrightness1 = map(fsrValues[1], 0, 1023, 0, 245);
+analogWrite(ledPins[1], ledBrightness1);
+
+// FSR 2 → LED D6 (max 255)
+fsrValues[2] = analogRead(fsrPins[2]);
+int ledBrightness2 = map(fsrValues[2], 0, 1023, 0, 255);
+analogWrite(ledPins[2], ledBrightness2);
+
+// FSR 3 → LED D11 (max 255)
+fsrValues[3] = analogRead(fsrPins[3]);
+int ledBrightness3 = map(fsrValues[3], 0, 1023, 0, 255);
+analogWrite(ledPins[3], ledBrightness3);
 
   // Read accelerometer (and gyroscope if needed)
   mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
