@@ -42,6 +42,12 @@ void loop() {
   // Read 4 FSR analog pins
   for (int i = 0; i < 4; i++) {
     fsrValues[i] = analogRead(fsrPins[i]);
+    
+    // Map FSR value (0-1023) to LED brightness (0-255)
+    int ledBrightness = map(fsrValues[i], 0, 1023, 0, 255);
+    
+    // Set LED brightness
+    analogWrite(ledPins[i], ledBrightness);
   }
 
   // Read accelerometer (and gyroscope if needed)
@@ -53,9 +59,7 @@ void loop() {
   gy_dps = gy / 131.0;
   gz_dps = gz / 131.0;
 
-
-
-  // Print all the values in a CSV format on the same line
+  // Print all values in CSV format
   Serial.print(fsrValues[0]); Serial.print(",");
   Serial.print(fsrValues[1]); Serial.print(",");
   Serial.print(fsrValues[2]); Serial.print(",");
@@ -67,23 +71,6 @@ void loop() {
   Serial.print(gy_dps); Serial.print(",");
   Serial.print(gz_dps);
   Serial.println();
-  
-
-  //check if any command is coming on the Serial Monitor from Processing
-  if (Serial.available() > 0) {
-    String cmd = Serial.readStringUntil('\n');
-    cmd.trim();
-    if (cmd == "LEDGREEN_ON") digitalWrite(3, HIGH);
-    else if (cmd == "LEDGREEN_OFF") digitalWrite(3, LOW);
-    if(cmd== "LEDBLUE_ON") digitalWrite(5, HIGH);
-    else if (cmd == "LEDBLUE_OFF") digitalWrite(5, LOW);
-    if(cmd== "LEDRED_ON") digitalWrite(6, HIGH);
-    else if (cmd == "LEDRED_OFF") digitalWrite(6, LOW);
-    if(cmd== "LEDYELLOW_ON") digitalWrite(11, HIGH);
-    else if (cmd == "LEDYELLOW_OFF") digitalWrite(11, LOW);
-    
-  } 
 
   delay(100); // 10 Hz sampling
 }
-
