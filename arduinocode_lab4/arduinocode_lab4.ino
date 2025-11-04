@@ -75,11 +75,11 @@ void loop() {
     cmd.trim();
     if (cmd == "LEDGREEN_ON") digitalWrite(3, HIGH);
     else if (cmd == "LEDGREEN_OFF") digitalWrite(3, LOW);
-    else if(cmd== "LEDBLUE_ON") digitalWrite(5, HIGH);
+    if(cmd== "LEDBLUE_ON") digitalWrite(5, HIGH);
     else if (cmd == "LEDBLUE_OFF") digitalWrite(5, LOW);
-    else if(cmd== "LEDRED_ON") digitalWrite(6, HIGH);
+    if(cmd== "LEDRED_ON") digitalWrite(6, HIGH);
     else if (cmd == "LEDRED_OFF") digitalWrite(6, LOW);
-    else if(cmd== "LEDYELLOW_ON") digitalWrite(11, HIGH);
+    if(cmd== "LEDYELLOW_ON") digitalWrite(11, HIGH);
     else if (cmd == "LEDYELLOW_OFF") digitalWrite(11, LOW);
     
   } 
