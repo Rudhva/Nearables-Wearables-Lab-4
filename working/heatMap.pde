@@ -40,6 +40,16 @@ float activityStartTime = 0;
 float totalActiveTime = 0;
 
 // -------------------------
+// Graph data
+// -------------------------
+int graphLength = 150;                // number of data points shown per graph
+float[][] fsrHistory = new float[4][graphLength];  // history for each FSR
+float graphWidth = 250;
+float graphHeight = 100;
+float graphX = 600;
+float graphYStart = 200;
+
+// -------------------------
 // Data logging
 // -------------------------
 Table sensorData;
@@ -49,7 +59,7 @@ Table sensorData;
 // -------------------------
 void heatMapSetup() {
   smooth(8);
-  footImg = loadImage("RightFoot.jpg");
+  footImg = loadImage("foot.jpg");
 
   scaleFactor = 600.0 / footImg.height;
   imgWidth = footImg.width * scaleFactor;
@@ -91,6 +101,7 @@ void heatMapDraw() {
   drawBars();
   drawStepInfo();
   drawMotionStatus();
+  drawFSRGraphs();
 }
 
 // -------------------------
@@ -129,6 +140,46 @@ void drawBars() {
     rect(1000, 150 + i * 150, 30, -barHeight);
     fill(0);
     text(labels[i] + ": " + int(fsrValues[i]), 1040, 150 + i * 150 - barHeight);
+  }
+}
+
+// -------------------------
+// Update and draw FSR graphs
+// -------------------------
+void drawFSRGraphs() {
+  for (int i = 0; i < 4; i++) {
+    // Shift old data
+    for (int j = 0; j < graphLength - 1; j++) {
+      fsrHistory[i][j] = fsrHistory[i][j + 1];
+    }
+    // Add new reading
+    fsrHistory[i][graphLength - 1] = fsrValues[i];
+
+    // Draw graph background
+    float gx = graphX;
+    float gy = graphYStart + i * (graphHeight + 40);
+    fill(245);
+    stroke(0);
+    rect(gx - 10, gy - graphHeight - 10, graphWidth + 20, graphHeight + 20);
+
+    // Draw label
+    fill(0);
+    text(labels[i], gx, gy - graphHeight - 20);
+
+    // Draw graph line
+    noFill();
+    stroke(0, 120, 255);
+    beginShape();
+    for (int j = 0; j < graphLength; j++) {
+      float x = gx + map(j, 0, graphLength - 1, 0, graphWidth);
+      float y = gy - map(fsrHistory[i][j], 0, 1023, 0, graphHeight);
+      vertex(x, y);
+    }
+    endShape();
+
+    // Axis line
+    stroke(0);
+    line(gx, gy, gx + graphWidth, gy);
   }
 }
 
@@ -174,10 +225,30 @@ void updateMFP() {
 // -------------------------
 // Motion detection
 // -------------------------
+// -------------------------
+// Motion detection (fixed)
+// -------------------------
+float baselineAccel = 1.0;        // average gravity magnitude (in g)
+float smoothedAccel = 0;          // low-pass filter variable
+float accelAlpha = 0.1;           // smoothing factor (0.0-1.0)
+float currentSpeed = 0;           // estimated motion intensity (arbitrary units)
+float speedDecay = 0.95;          // speed slows down over time
+
 void detectMotion() {
+  // Calculate acceleration magnitude (normalized around 1g)
   float accelMag = sqrt(accelX*accelX + accelY*accelY + accelZ*accelZ);
 
-  if (accelMag > motionThreshold) {
+  // Smooth acceleration
+  smoothedAccel = lerp(smoothedAccel, accelMag, accelAlpha);
+
+  // Compute motion intensity (difference from gravity)
+  float motion = abs(smoothedAccel - baselineAccel);
+
+  // Integrate motion into a "speed" variable
+  currentSpeed = currentSpeed * speedDecay + motion * 5.0; // scale factor adjusts responsiveness
+
+  // Motion threshold determines if we're moving
+  if (motion > motionThreshold) {
     if (!inMotion) {
       inMotion = true;
       activityStartTime = millis();
@@ -191,7 +262,7 @@ void detectMotion() {
 }
 
 // -------------------------
-// Draw motion info (moved to top-right corner)
+// Draw motion info (with speed)
 // -------------------------
 void drawMotionStatus() {
   fill(0);
@@ -200,12 +271,10 @@ void drawMotionStatus() {
   float activeSec = totalActiveTime / 1000.0;
   if (inMotion) activeSec += (millis() - activityStartTime) / 1000.0;
   
-  // Position at top-right corner
   float xPos = width - 300;
   float yPos = 50;
+  
   text("User Status: " + status, xPos, yPos);
-  text("Active Time: " + nf(activeSec,1,2) + " s", xPos, yPos + 30);
+  text("Speed: " + nf(currentSpeed, 1, 2), xPos, yPos + 30);
+  text("Active Time: " + nf(activeSec, 1, 2) + " s", xPos, yPos + 60);
 }
-
-
-
