@@ -78,17 +78,17 @@ analogWrite(ledPins[3], ledBrightness3);
   gz_dps = gz / 131.0;
 
   // Print all values in CSV format
-  Serial.print(fsrValues[0]); Serial.print(",");
-  Serial.print(fsrValues[1]); Serial.print(",");
-  Serial.print(fsrValues[2]); Serial.print(",");
-  Serial.print(fsrValues[3]); Serial.print(",");
-  Serial.print(ax_g); Serial.print(",");
-  Serial.print(ay_g); Serial.print(",");
-  Serial.print(az_g);Serial.println(",");
-  Serial.print(gx_dps); Serial.print(",");
-  Serial.print(gy_dps); Serial.print(",");
-  Serial.print(gz_dps);
-  Serial.println();
+Serial.print(fsrValues[0]); Serial.print(",");
+Serial.print(fsrValues[1]); Serial.print(",");
+Serial.print(fsrValues[2]); Serial.print(",");
+Serial.print(fsrValues[3]); Serial.print(",");
+Serial.print(ax_g); Serial.print(",");
+Serial.print(ay_g); Serial.print(",");
+Serial.print(az_g); Serial.print(",");
+Serial.print(gx_dps); Serial.print(",");
+Serial.print(gy_dps); Serial.print(",");
+Serial.println(gz_dps); // println only once at the very end!
+
 
   delay(100); // 10 Hz sampling
 }
