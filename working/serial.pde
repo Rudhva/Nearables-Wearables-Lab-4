@@ -3,6 +3,7 @@
 // serial.pde (Processing)
 // -------------------------
 import processing.serial.*;
+boolean useFakeData = true;
 
 
 final int SERIAL_PORT_INDEX = 7; 
@@ -18,26 +19,35 @@ float gyroX, gyroY, gyroZ;
 void setupSerial() {
   println("Serial ports:");
   String[] ports = Serial.list();
-  for (int i = 0; i < ports.length; i++) println("  [" + i + "] " + ports[i]);
-  if (ports.length == 0) { 
-    println("No serial ports found."); 
-    return; 
-  }
+  for (int i = 0; i < ports.length; i++) println("  ["+i+"] "+ports[i]);
+  if (ports.length == 0) { println("No serial ports found."); return; }
 
-  // Choose a port (either by index or auto-pick)
   String chosen;
   if (SERIAL_PORT_INDEX >= 0 && SERIAL_PORT_INDEX < ports.length) {
-    chosen = ports[SERIAL_PORT_INDEX];
+    chosen = ports[SERIAL_PORT_INDEX];               // <<< force by index
   } else {
+    // better auto-pick: prefer usbmodem/usbserial/tty.*
     chosen = ports[ports.length - 1];
+    for (String p : ports) {
+      String pl = p.toLowerCase();
+      if ((pl.contains("usbmodem") || pl.contains("usbserial") || pl.contains("tty."))
+          && !pl.contains("bluetooth")) { chosen = p; break; }
+    }
   }
 
-  println("Opening serial on " + chosen + " at 115200...");
+    // Initialize serial as in Codice 1
   try {
-    myPort = new Serial(this, chosen, 115200);
-    println("✅ Serial opened successfully!");
+    myPort = new Serial(this, "COM3", 115200);
+    println("Serial opened on COM3 115200");
   } catch (Exception e) {
-    println("❌ Failed to open serial: " + e.getMessage());
+    println("Failed to open serial on WINDOWS: " + e.getMessage());
+  }
+  try {
+    String portName = Serial.list()[Serial.list().length - 1];
+    myPort = new Serial(this, portName, 115200);
+    println("Serial opened on COM3 115200");
+  } catch (Exception e) {
+    println("Failed to open serial on MAC: " + e.getMessage());
   }
 }
 

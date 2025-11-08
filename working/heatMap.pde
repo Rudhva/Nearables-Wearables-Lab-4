@@ -8,7 +8,7 @@ float[] fsrTargets = new float[4];
 
 float[] xOffsets = {160, 80, 70, 115};
 float[] yOffsets = {180, 100, 240, 470};
-String[] labels = {"Big Toe", "Ball", "Midfoot", "Heel"};
+String[] labels = {" Forefoot", "Medial Forefoot", "Midfoot", "Heel"};
 
 // -------------------------
 // Layout + palette
@@ -530,4 +530,10 @@ void mousePressed() {
     stepThreshold = highResistanceMode ? 800 : 300;
     println("Threshold mode switched → " + stepThreshold);
   }
+    // toggle if clicked near bottom-right corner
+  if (dist(mouseX, mouseY, width - 20, height - 20) < 10) {
+    useFakeData = !useFakeData;
+    println("Data mode: " + (useFakeData ? "FAKE (randomInput)" : "REAL (readSerial)"));
+  }
 }
+
