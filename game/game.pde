@@ -1,10 +1,13 @@
 // ----------------------------------------------------
 // Space Jumper Deluxe (FSR + Spacebar, 60 FPS)
 // Uses Cactus.png instead of orange rectangles
+// With Serial Integration (FSR-controlled jump)
 // ----------------------------------------------------
 
 import processing.serial.*;
 Serial myPort;
+
+int SERIAL_PORT_INDEX = -1; // set manually if you want (e.g., 0, 1, 2...)
 
 int state = 0; 
 float playerY, playerVel;
@@ -36,8 +39,8 @@ float cloudSpeed = 1;
 // Player visuals
 ArrayList<PVector> jumpTrail = new ArrayList<PVector>();
 int trailLength = 10;
-PImage dino;    // 🦖 Dino sprite
-PImage cactus;  // 🌵 Cactus sprite
+PImage dino;    
+PImage cactus;  
 
 // ----------------------------------------------------
 void setup() {
@@ -46,22 +49,14 @@ void setup() {
   textAlign(CENTER, CENTER);
   smooth(8);
 
-  // 🦖 Load Dino and Cactus images from data folder
+  // 🦖 Load Dino and Cactus images
   dino = loadImage("Dino.png");
   dino.resize(60, 60);
   
   cactus = loadImage("Cactus.png");
-  cactus.resize(45, 65);  // visually replaces the old 30x50 rects
+  cactus.resize(45, 65);
 
-  println(Serial.list());
-  try {
-    myPort = new Serial(this, Serial.list()[0], 115200);
-    myPort.bufferUntil('\n');
-  } catch (Exception e) {
-    println("⚠️ Serial not connected — running keyboard mode only.");
-    myPort = null;
-  }
-
+  setupSerial();     // ✅ initialize serial port
   setupBackground();
   resetGame();
 }
@@ -102,11 +97,11 @@ void drawGame() {
   fill(90, 180, 90);
   rect(0, ground, width, height - ground);
 
-  // --- Shadow (unchanged) ---
+  // --- Shadow ---
   fill(0, 50);
   ellipse(120, ground + 10, 60, 10);
 
-  // --- Player trail (unchanged) ---
+  // --- Player trail ---
   jumpTrail.add(new PVector(120, playerY));
   if (jumpTrail.size() > trailLength) jumpTrail.remove(0);
 
@@ -118,7 +113,7 @@ void drawGame() {
   }
   noTint();
 
-  // --- Player (unchanged offsets) ---
+  // --- Player ---
   image(dino, 100, playerY+10);
 
   // --- Physics ---
@@ -129,11 +124,9 @@ void drawGame() {
     playerVel = 0;
   }
 
-  // --- Obstacles (NOW USING CACTUS.PNG) ---
+  // --- Obstacles (Cactus) ---
   for (int i = obstacles.size()-1; i >= 0; i--) {
     float x = obstacles.get(i);
-
-    // draw cactus aligned to same ground position as before
     image(cactus, x, ground - obstacleH - 10);
 
     x -= speed;
@@ -146,14 +139,13 @@ void drawGame() {
       if (score > highScore) highScore = score;
     }
 
-    // Collision box remains same as before
     if (x < 140 && x + obstacleW > 100 &&
         playerY + 60 > ground - obstacleH) {
       state = 2;
     }
   }
 
-  // --- HUD (unchanged) ---
+  // --- HUD ---
   fill(0, 120);
   textSize(20);
   textAlign(RIGHT, TOP);
@@ -219,10 +211,9 @@ void drawClouds() {
   noStroke();
   for (PVector c : clouds) {
     fill(255, 255, 255, 180);
-    ellipse(c.x,     c.y,     60, 35);
+    ellipse(c.x, c.y, 60, 35);
     ellipse(c.x + 20, c.y + 5, 50, 30);
     ellipse(c.x - 20, c.y + 5, 50, 30);
-
     c.x -= cloudSpeed;
     if (c.x < -60) {
       c.x = width + random(100, 400);
@@ -240,38 +231,70 @@ void drawGradientBackground() {
   }
 }
 
-// ---------------- SERIAL ----------------
+// ---------------- SERIAL SETUP ----------------
+void setupSerial() {
+  println("Serial ports:");
+  String[] ports = Serial.list();
+  for (int i = 0; i < ports.length; i++) println("  [" + i + "] " + ports[i]);
+  if (ports.length == 0) { 
+    println("No serial ports found."); 
+    return; 
+  }
+
+  String chosen;
+  if (SERIAL_PORT_INDEX >= 0 && SERIAL_PORT_INDEX < ports.length) {
+    chosen = ports[SERIAL_PORT_INDEX];
+  } else {
+    chosen = ports[ports.length - 1];
+  }
+
+  println("Opening serial on " + chosen + " at 115200...");
+  try {
+    myPort = new Serial(this, chosen, 115200);
+    myPort.bufferUntil('\n');
+    println("✅ Serial opened successfully!");
+  } catch (Exception e) {
+    println("❌ Failed to open serial: " + e.getMessage());
+  }
+}
+
+// ---------------- SERIAL READ ----------------
 void readSerial() {
   if (myPort == null) return;
   if (myPort.available() <= 0) return;
 
   String line = myPort.readStringUntil('\n');
   if (line == null) return;
+
   line = trim(line);
   if (line.length() == 0) return;
 
+  // Expect 10 comma-separated values
   if (!line.matches("^[0-9,\\-\\.]+$")) return;
   String[] tokens = split(line, ',');
-  if (tokens.length != 10) return;
+  if (tokens.length != 10) {
+    println("⚠️ Invalid packet (" + tokens.length + " fields): " + line);
+    return;
+  }
 
-  try {
-    heel   = int(tokens[0]);
-    mf     = int(tokens[3]);
-    mm     = int(tokens[1]);
-    lf     = int(tokens[2]);
-    accelX = float(tokens[4]);
-    accelY = float(tokens[5]);
-    accelZ = float(tokens[6]);
-    gyroX  = float(tokens[7]);
-    gyroY  = float(tokens[8]);
-    gyroZ  = float(tokens[9]);
+  try { 
+    heel    = int(tokens[0]);
+    mf      = int(tokens[3]);
+    mm      = int(tokens[1]);
+    lf      = int(tokens[2]);
+    accelX  = float(tokens[4]);
+    accelY  = float(tokens[5]);
+    accelZ  = float(tokens[6]);
+    gyroX   = float(tokens[7]);
+    gyroY   = float(tokens[8]);
+    gyroZ   = float(tokens[9]);
     latestSerialMessage = line;
   } catch (Exception e) {
     println("⚠️ Parse error: " + e.getMessage());
   }
 
-  fsrValues[0] = lf;
-  fsrValues[1] = mf;
-  fsrValues[2] = mm;
-  fsrValues[3] = heel - 10;
+  fsrValues[0] = lf;   // Big Toe
+  fsrValues[1] = mf;   // Ball
+  fsrValues[2] = mm;   // Midfoot
+  fsrValues[3] = heel - 10; // Heel offset
 }
