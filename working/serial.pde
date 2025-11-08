@@ -3,7 +3,7 @@
 // serial.pde (Processing)
 // -------------------------
 import processing.serial.*;
-boolean useFakeData = true;
+boolean useFakeData = false;
 
 
 final int SERIAL_PORT_INDEX = 7; 
