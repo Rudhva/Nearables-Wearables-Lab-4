@@ -86,3 +86,39 @@ void readSerial() {
   fsrValues[2] = mm;   // Midfoot
   fsrValues[3] = heel - 10;
 }
+
+
+
+// -------------------------
+// Random realistic fallback
+// -------------------------
+void randomInput() {
+  // simulate foot pressure pattern: heel + ball dominant, midfoot low
+  float t = millis() / 1000.0;
+  float stepPhase = sin(t * 2.0); // smooth walking rhythm
+
+  // Add some noise
+  float noiseScale = 50;
+
+  heel = int(700 + 200 * max(0, -stepPhase) + random(-noiseScale, noiseScale));
+  mf   = int(500 + 250 * max(0, stepPhase) + random(-noiseScale, noiseScale));
+  lf   = int(400 + 180 * max(0, stepPhase) + random(-noiseScale, noiseScale));
+  mm   = int(150 + 80  * abs(sin(t * 1.5)) + random(-noiseScale / 2, noiseScale / 2));
+
+  // Simulate accelerometer motion
+  accelX = 0.05 * sin(t * 4) + random(-2, 2);
+  accelY = 0.07 * cos(t * 3) + random(-0.02, 0.02);
+  accelZ = 1.0 + 0.05 * sin(t * 2) + random(-0.02, 0.02); // around 1g
+
+  // Gyro values fluctuate slightly
+  gyroX = random(-5, 5);
+  gyroY = random(-5, 5);
+  gyroZ = random(-5, 5);
+
+  fsrValues[0] = lf;
+  fsrValues[1] = mf;
+  fsrValues[2] = mm;
+  fsrValues[3] = heel - 10;
+
+  latestSerialMessage = nf(heel, 1, 0) + "," + nf(mf, 1, 0) + "," + nf(mm, 1, 0) + "," + nf(lf, 1, 0);
+}

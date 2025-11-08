@@ -1,5 +1,5 @@
 void setup() {
-  size(1200, 800);
+  size(1200, 850);
   heatMapSetup();
   setupSerial();
 }
@@ -7,5 +7,6 @@ void setup() {
 void draw() {
   background(255);
   heatMapDraw();
-  readSerial();
+  //readSerial();
+  randomInput();
 }

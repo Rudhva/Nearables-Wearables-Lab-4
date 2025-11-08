@@ -10,6 +10,33 @@ float[] xOffsets = {160, 80, 70, 115};
 float[] yOffsets = {180, 100, 240, 470};
 String[] labels = {"Big Toe", "Ball", "Midfoot", "Heel"};
 
+// -------------------------
+// Layout + palette
+// -------------------------
+color bgColor = color(241, 244, 252);
+color cardColor = color(255);
+color headingColor = color(26, 33, 54);
+color mutedTextColor = color(103, 112, 130);
+color accentPrimary = color(82, 126, 255);
+color accentSecondary = color(254, 157, 74);
+color alertColor = color(244, 114, 117);
+color successColor = color(45, 212, 191);
+
+float heatPanelX = 40;
+float heatPanelY = 150;
+float heatPanelWidth = 520;
+float heatPanelHeight = 580;
+
+float rightPanelX = 600;
+float rightPanelWidth = 520;
+float rightColumnSpacing = 24;
+
+String fsrUnitAbbrev = "FSR";
+String fsrAxisLabel = "FSR units (0-1023)";
+String graphTimeLabel = "Time (older -> now)";
+String accelSensorLabel = "MPU-6050 (GY-521)";
+String accelUnitLabel = "g";
+
 float scaleFactor;
 float imgWidth, imgHeight;
 float imgX = 200, imgY = 100;
@@ -44,10 +71,7 @@ float totalActiveTime = 0;
 // -------------------------
 int graphLength = 150;                // number of data points shown per graph
 float[][] fsrHistory = new float[4][graphLength];  // history for each FSR
-float graphWidth = 250;
-float graphHeight = 100;
-float graphX = 600;
-float graphYStart = 200;
+float graphHeight = 60;
 
 // -------------------------
 // Data logging
@@ -60,10 +84,15 @@ Table sensorData;
 void heatMapSetup() {
   smooth(8);
   footImg = loadImage("foot.jpg");
-
-  scaleFactor = 600.0 / footImg.height;
+  float maxFootWidth = heatPanelWidth - 120;
+  float maxFootHeight = heatPanelHeight - 160;
+  float scaleW = maxFootWidth / footImg.width;
+  float scaleH = maxFootHeight / footImg.height;
+  scaleFactor = min(scaleW, scaleH);
   imgWidth = footImg.width * scaleFactor;
   imgHeight = footImg.height * scaleFactor;
+  imgX = heatPanelX + (heatPanelWidth - imgWidth) / 2;
+  imgY = heatPanelY + 100;
 
   for (int i = 0; i < fsrValues.length; i++) {
     fsrValues[i] = random(0, 1023);
@@ -77,31 +106,18 @@ void heatMapSetup() {
 // Heatmap draw
 // -------------------------
 void heatMapDraw() {
-  image(footImg, imgX, imgY, imgWidth, imgHeight);
-
-  // Update fsrValues with already-provided values (from serial or other files)
-  // fsrValues[0] = lf, fsrValues[1] = mf, fsrValues[2] = mm, fsrValues[3] = heel
+  background(bgColor);
 
   detectStep();      // Update step count and cadence
   updateMFP();       // Update MFP calculation
   detectMotion();    // Detect motion using accelerometer
 
-  noStroke();
-  for (int i = 0; i < fsrValues.length; i++) {
-    float x = imgX + xOffsets[i] * scaleFactor;
-    float y = imgY + yOffsets[i] * scaleFactor;
-
-    float val = fsrValues[i];
-    float radius = map(val, 0, 1023, 40, 150);
-    radius = constrain(radius, 40, 120);
-
-    drawSoftSpot(x, y, radius, val);
-  }
-
-  drawBars();
   drawStepInfo();
-  drawMotionStatus();
-  drawFSRGraphs();
+  drawHeatPanel();
+  float motionBottom = drawMotionStatus();
+  float barsBottom = drawBars(motionBottom + rightColumnSpacing);
+  drawFSRGraphs(barsBottom + rightColumnSpacing);
+  drawResistanceToggle();
 }
 
 // -------------------------
@@ -116,6 +132,56 @@ void drawSoftSpot(float x, float y, float radius, float val) {
     fill(red(c), green(c), blue(c), alpha);
     ellipse(x, y, r, r);
   }
+}
+
+void drawHeatPanel() {
+  float radius = 28;
+  drawCard(heatPanelX, heatPanelY, heatPanelWidth, heatPanelHeight, radius);
+
+  fill(mutedTextColor);
+  textSize(13);
+  text("Pressure Map", heatPanelX + 32, heatPanelY + 38);
+  fill(headingColor);
+  textSize(26);
+  text("Foot Heatmap", heatPanelX + 32, heatPanelY + 70);
+
+  imgX = heatPanelX + (heatPanelWidth - imgWidth) / 2;
+  imgY = heatPanelY + 110;
+  image(footImg, imgX, imgY, imgWidth, imgHeight);
+
+  noStroke();
+  for (int i = 0; i < fsrValues.length; i++) {
+    float x = imgX + xOffsets[i] * scaleFactor;
+    float y = imgY + yOffsets[i] * scaleFactor;
+
+    float val = fsrValues[i];
+    float radiusSpot = map(val, 0, 1023, 40, 150);
+    radiusSpot = constrain(radiusSpot, 40, 120);
+
+    drawSoftSpot(x, y, radiusSpot, val);
+  }
+
+  drawHeatLegend(heatPanelX + 32, heatPanelY + heatPanelHeight - 60);
+}
+
+void drawHeatLegend(float x, float y) {
+  float legendWidth = heatPanelWidth - 64;
+  float legendHeight = 12;
+  int steps = 60;
+  noStroke();
+  for (int i = 0; i < steps; i++) {
+    float t = i / float(steps - 1);
+    fill(heatColor(t * 1023));
+    float segmentWidth = legendWidth / steps;
+    rect(x + i * segmentWidth, y+10, segmentWidth + 1, legendHeight, 6);
+  }
+  textSize(12);
+  fill(mutedTextColor);
+  textAlign(LEFT);
+  text("Low", x, y + 35);
+  textAlign(RIGHT);
+  text("High", x + legendWidth, y + 35);
+  textAlign(LEFT);
 }
 
 // -------------------------
@@ -133,21 +199,59 @@ int heatColor(float v) {
 // -------------------------
 // Draw side bars for each sensor
 // -------------------------
-void drawBars() {
-  for (int i = 0; i < fsrValues.length; i++) {
-    fill(100, 200, 255);
-    float barHeight = map(fsrValues[i], 0, 1023, 0, 200);
-    rect(1000, 150 + i * 150, 30, -barHeight);
-    fill(0);
-    text(labels[i] + ": " + int(fsrValues[i]), 1040, 150 + i * 150 - barHeight);
-  }
-}
+float drawBars(float startY) {
+  float cardHeight = 78;  // ↑ slightly taller than before (was 68)
+  float spacing = 18;     // ↑ a little more vertical spacing
+  float contentX = rightPanelX + 30;
+  float trackWidth = rightPanelWidth - 60;
+  float lastBottom = startY;
 
+  for (int i = 0; i < fsrValues.length; i++) {
+    float cardY = startY + i * (cardHeight + spacing);
+    drawCard(rightPanelX, cardY, rightPanelWidth, cardHeight, 20);
+
+    float value = fsrValues[i];
+    float pct = constrain(value / 1023.0, 0, 1);
+
+    fill(mutedTextColor);
+    textSize(13);
+    text(labels[i].toUpperCase(), contentX, cardY + 26);
+
+    fill(headingColor);
+    textSize(24);
+    text(int(value) + " " + fsrUnitAbbrev, contentX, cardY + 45);
+
+    float trackY = cardY + cardHeight - 26;
+    noStroke();
+    fill(230, 234, 245);
+    rect(contentX, trackY, trackWidth, 10, 8);
+    fill(accentPrimary);
+    rect(contentX, trackY, trackWidth * pct, 10, 8);
+
+    textAlign(RIGHT);
+    fill(mutedTextColor);
+    textSize(12);
+    text(int(pct * 100) + "%", rightPanelX + rightPanelWidth - 20, cardY + 32);
+    textAlign(LEFT);
+
+    lastBottom = cardY + cardHeight;
+  }
+
+  return lastBottom;
+}
 // -------------------------
 // Update and draw FSR graphs
 // -------------------------
-void drawFSRGraphs() {
-  for (int i = 0; i < 4; i++) {
+void drawFSRGraphs(float startY) {
+  int cardsPerRow = 2;
+  float horizontalPadding = 24;
+  float cardSpacing = 16;
+  float cardRadius = 22;
+  float cardHeight = graphHeight + 64;
+  float cardWidth = (rightPanelWidth - horizontalPadding * 2 - cardSpacing) / cardsPerRow;
+  float innerPadding = 22;
+
+  for (int i = 0; i < fsrValues.length; i++) {
     // Shift old data
     for (int j = 0; j < graphLength - 1; j++) {
       fsrHistory[i][j] = fsrHistory[i][j + 1];
@@ -155,31 +259,67 @@ void drawFSRGraphs() {
     // Add new reading
     fsrHistory[i][graphLength - 1] = fsrValues[i];
 
-    // Draw graph background
-    float gx = graphX;
-    float gy = graphYStart + i * (graphHeight + 40);
-    fill(245);
-    stroke(0);
-    rect(gx - 10, gy - graphHeight - 10, graphWidth + 20, graphHeight + 20);
+    int row = i / cardsPerRow;
+    int col = i % cardsPerRow;
+    float cardX = rightPanelX + horizontalPadding + col * (cardWidth + cardSpacing);
+    float cardY = startY + row * (cardHeight + cardSpacing);
 
-    // Draw label
-    fill(0);
-    text(labels[i], gx, gy - graphHeight - 20);
+    drawCard(cardX, cardY, cardWidth, cardHeight, cardRadius);
 
-    // Draw graph line
+    float labelX = cardX + innerPadding;
+    float labelY = cardY + 30;
+
+    fill(mutedTextColor);
+    textSize(12);
+    text(labels[i] + " trend", labelX, labelY);
+
+    textAlign(RIGHT);
+    fill(headingColor);
+    text("Now " + int(fsrValues[i]) + " " + fsrUnitAbbrev, cardX + cardWidth - innerPadding, labelY);
+    textAlign(LEFT);
+
+    float graphLeft = cardX + innerPadding;
+    float graphRight = cardX + cardWidth - innerPadding;
+    float graphBottom = cardY + cardHeight - innerPadding;
+    float graphTop = graphBottom - graphHeight;
+    float graphW = graphRight - graphLeft;
+
+    stroke(229, 232, 242);
+    strokeWeight(1);
+    for (int g = 0; g <= 4; g++) {
+      float gy = lerp(graphBottom, graphTop, g / 4.0);
+      line(graphLeft, gy, graphLeft + graphW, gy);
+    }
+
     noFill();
-    stroke(0, 120, 255);
+    stroke(accentPrimary);
+    strokeWeight(2);
     beginShape();
     for (int j = 0; j < graphLength; j++) {
-      float x = gx + map(j, 0, graphLength - 1, 0, graphWidth);
-      float y = gy - map(fsrHistory[i][j], 0, 1023, 0, graphHeight);
+      float x = graphLeft + map(j, 0, graphLength - 1, 0, graphW);
+      float y = map(fsrHistory[i][j], 0, 1023, graphBottom, graphTop);
       vertex(x, y);
     }
     endShape();
 
-    // Axis line
-    stroke(0);
-    line(gx, gy, gx + graphWidth, gy);
+    noStroke();
+    fill(accentSecondary);
+    float latestY = map(fsrValues[i], 0, 1023, graphBottom, graphTop);
+    ellipse(graphLeft + graphW, latestY, 8, 8);
+
+    // Axis labels for clarity
+    fill(mutedTextColor);
+    textSize(11);
+    textAlign(CENTER);
+    text(graphTimeLabel, graphLeft + graphW / 2.0, graphBottom + 18);
+
+    pushMatrix();
+    translate(cardX + 12, (graphTop + graphBottom) / 2.0);
+    rotate(-HALF_PI);
+    text(fsrAxisLabel, 0, 0);
+    popMatrix();
+
+    textAlign(LEFT);
   }
 }
 
@@ -200,14 +340,45 @@ void detectStep() {
 }
 
 // -------------------------
-// Draw step and MFP info
+// Draw insight cards (steps, cadence, MFP)
 // -------------------------
 void drawStepInfo() {
-  fill(0);
-  textSize(20);
-  text("Step Count: " + stepCount, 50, 50);
-  text("Cadence: " + int(cadence) + " steps/min", 50, 80);
-  text("MFP: " + nf(MFP,1,2) + "%", 50, 110);
+  float spacing = 16;
+  float cardWidth = (heatPanelWidth - spacing * 2) / 3.0;
+  float cardHeight = 90;
+  float cardY = 30;
+
+  drawMetricCard(heatPanelX, cardY, cardWidth, cardHeight,
+                 "Step Count", str(stepCount), "total steps");
+
+  String cadenceValue = nf(cadence, 1, 0);
+  drawMetricCard(heatPanelX + cardWidth + spacing, cardY, cardWidth, cardHeight,
+                 "Cadence", cadenceValue, "steps / min");
+
+  String mfpValue = nf(MFP, 1, 1) + "%";
+  drawMetricCard(heatPanelX + 2 * (cardWidth + spacing), cardY, cardWidth, cardHeight,
+                 "MFP", mfpValue, "forefoot load (%)");
+}
+
+void drawMetricCard(float x, float y, float w, float h, String label, String value, String helper) {
+  drawCard(x, y, w, h, 18);
+  fill(mutedTextColor);
+  textSize(12);
+  text(label.toUpperCase(), x + 18, y + 24);
+  fill(headingColor);
+  textSize(30);
+  text(value, x + 18, y + 60);
+  fill(mutedTextColor);
+  textSize(12);
+  text(helper, x + 18, y + h - 16);
+}
+
+void drawCard(float x, float y, float w, float h, float radius) {
+  noStroke();
+  fill(0, 18);
+  rect(x, y + 6, w, h, radius);
+  fill(cardColor);
+  rect(x, y, w, h, radius);
 }
 
 // -------------------------
@@ -233,6 +404,7 @@ float smoothedAccel = 0;          // low-pass filter variable
 float accelAlpha = 0.1;           // smoothing factor (0.0-1.0)
 float currentSpeed = 0;           // estimated motion intensity (arbitrary units)
 float speedDecay = 0.95;          // speed slows down over time
+float lastMotionDelta = 0;        // most recent accel delta in g
 
 void detectMotion() {
   // Calculate acceleration magnitude (normalized around 1g)
@@ -243,6 +415,7 @@ void detectMotion() {
 
   // Compute motion intensity (difference from gravity)
   float motion = abs(smoothedAccel - baselineAccel);
+  lastMotionDelta = motion;
 
   // Integrate motion into a "speed" variable
   currentSpeed = currentSpeed * speedDecay + motion * 5.0; // scale factor adjusts responsiveness
@@ -264,17 +437,97 @@ void detectMotion() {
 // -------------------------
 // Draw motion info (with speed)
 // -------------------------
-void drawMotionStatus() {
-  fill(0);
-  textSize(20);
-  String status = inMotion ? "In Motion" : "Standing Still";
+float drawMotionStatus() {
+  float cardX = rightPanelX;
+  float cardY = 30;
+  float cardW = rightPanelWidth;
+  float cardH = 100;  // ↓ shortened from 140 to make room for other tiles
+  float radius = 22;
+
+  drawCard(cardX, cardY, cardW, cardH, radius);
+
+  String status = inMotion ? "In Motion" : "Idle";
+  color statusColor = inMotion ? successColor : alertColor;
   float activeSec = totalActiveTime / 1000.0;
   if (inMotion) activeSec += (millis() - activityStartTime) / 1000.0;
-  
-  float xPos = width - 300;
-  float yPos = 50;
-  
-  text("User Status: " + status, xPos, yPos);
-  text("Speed: " + nf(currentSpeed, 1, 2), xPos, yPos + 30);
-  text("Active Time: " + nf(activeSec, 1, 2) + " s", xPos, yPos + 60);
+
+  fill(mutedTextColor);
+  textSize(12);
+  text("Motion Status", cardX + 28, cardY + 24);
+
+  fill(statusColor);
+  textSize(28);
+  text(status, cardX + 28, cardY + 58);
+
+  fill(mutedTextColor);
+  textSize(13);
+  text("Intensity: " + nf(currentSpeed, 1, 2) + " g", cardX + 28, cardY + 84);
+
+  textAlign(RIGHT);
+  fill(headingColor);
+  textSize(20);
+  text("Active " + nf(activeSec, 1, 1) + "s", cardX + cardW - 28, cardY + 52);
+  textSize(11);
+  fill(mutedTextColor);
+  textAlign(LEFT);
+
+  return cardY + cardH;
+}
+
+
+
+// -------------------------
+// Toggle threshold UI (bottom-left corner)
+// -------------------------
+boolean highResistanceMode = false;
+
+void drawResistanceToggle() {
+  float cardW = 220;
+  float cardH = 48;
+  float cardX = heatPanelX + 30;   // ⬅️ left side of heatmap panel
+  float cardY = height - cardH - 30;
+  float radius = 16;
+
+  // Background card (with soft shadow)
+  noStroke();
+  fill(0, 18);
+  rect(cardX, cardY + 5, cardW, cardH, radius);
+  fill(cardColor);
+  rect(cardX, cardY, cardW, cardH, radius);
+
+  // Label + value
+  fill(mutedTextColor);
+  textSize(12);
+  textAlign(LEFT);
+  text("Resistance Mode", cardX + 16, cardY + 18);
+
+  fill(headingColor);
+  textSize(16);
+  text(highResistanceMode ? "High" : "Low", cardX + 16, cardY + 38);
+
+  // Accent bar on right edge of button
+  noStroke();
+  fill(highResistanceMode ? accentSecondary : accentPrimary);
+  rect(cardX + cardW - 12, cardY + 8, 6, cardH - 16, 3);
+
+  // Threshold value text
+  textAlign(RIGHT);
+  fill(mutedTextColor);
+  textSize(11);
+  textAlign(LEFT);
+}
+
+// Handle mouse click toggle
+void mousePressed() {
+  float cardW = 220;
+  float cardH = 48;
+  float cardX = heatPanelX + 30;   // ⬅️ same as drawResistanceToggle
+  float cardY = height - cardH - 30;
+
+  if (mouseX > cardX && mouseX < cardX + cardW &&
+      mouseY > cardY && mouseY < cardY + cardH) {
+    highResistanceMode = !highResistanceMode;
+    stepThreshold = highResistanceMode ? 800 : 300;
+    println("Threshold mode switched → " + stepThreshold);
+  }
 }
