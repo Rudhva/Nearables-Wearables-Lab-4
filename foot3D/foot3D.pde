@@ -20,6 +20,12 @@ float rotY = 0;
 float rotZ = 0;
 float smooth = 0.1;
 
+// Calibration
+float baseAccelX = 0;
+float baseAccelY = 0;
+float baseAccelZ = 0;
+boolean calibrated = false;
+
 // 3D foot model
 PShape foot;
 
@@ -50,7 +56,6 @@ void draw() {
   directionalLight(255, 220, 200, -0.3, 0.4, -1);
   pointLight(255, 180, 160, width/2, height/2, 400);
 
-  // Update orientation based on accelerometer
   updateRotationFromAccel();
 
   translate(width/2, height/1.5, -400);
@@ -61,7 +66,6 @@ void draw() {
   fill(242, 198, 158);
   shape(foot);
 
-  // Optional debug overlay
   drawHUD();
 }
 
@@ -139,9 +143,14 @@ void serialEvent(Serial p) {
 // Map accelerometer to rotation angles
 // ------------------------------------------------------------
 void updateRotationFromAccel() {
-  // Convert raw accelerometer data into approximate tilt angles
-  float tiltX = atan2(accelY, sqrt(accelX*accelX + accelZ*accelZ));
-  float tiltY = atan2(-accelX, sqrt(accelY*accelY + accelZ*accelZ));
+  // Apply calibration offset
+  float adjX = accelX - baseAccelX;
+  float adjY = accelY - baseAccelY;
+  float adjZ = accelZ - baseAccelZ;
+
+  // Convert adjusted values into tilt angles
+  float tiltX = atan2(adjY, sqrt(adjX*adjX + adjZ*adjZ));
+  float tiltY = atan2(-adjX, sqrt(adjY*adjY + adjZ*adjZ));
 
   // Smooth transitions for stable movement
   rotX = lerp(rotX, tiltX, smooth);
@@ -161,5 +170,27 @@ void drawHUD() {
        "  AccelY: " + nf(accelY, 1, 2) + 
        "  AccelZ: " + nf(accelZ, 1, 2), 10, height - 30);
   text("Latest packet: " + latestSerialMessage, 10, height - 10);
+
+  if (calibrated)
+    text("✅ Calibrated (Press 'C' again to recalibrate)", 10, height - 50);
+  else
+    text("Press 'C' to calibrate baseline", 10, height - 50);
+
   hint(ENABLE_DEPTH_TEST);
+}
+
+// ------------------------------------------------------------
+// Calibration trigger
+// ------------------------------------------------------------
+void keyPressed() {
+  if (key == 'c' || key == 'C') {
+    baseAccelX = accelX;
+    baseAccelY = accelY;
+    baseAccelZ = accelZ;
+    calibrated = true;
+    println("✅ Calibration complete:");
+    println("  baseAccelX=" + baseAccelX);
+    println("  baseAccelY=" + baseAccelY);
+    println("  baseAccelZ=" + baseAccelZ);
+  }
 }
