@@ -521,17 +521,23 @@ void drawResistanceToggle() {
 void mousePressed() {
   float cardW = 220;
   float cardH = 48;
-  float cardX = heatPanelX + 30;   // ⬅️ same as drawResistanceToggle
+  float cardX = heatPanelX + 30;   // same as drawResistanceToggle
   float cardY = height - cardH - 30;
 
+  // ---- Resistance Mode Button (bottom-left) ----
   if (mouseX > cardX && mouseX < cardX + cardW &&
       mouseY > cardY && mouseY < cardY + cardH) {
     highResistanceMode = !highResistanceMode;
     stepThreshold = highResistanceMode ? 800 : 300;
     println("Threshold mode switched → " + stepThreshold);
   }
-    // toggle if clicked near bottom-right corner
-  if (dist(mouseX, mouseY, width - 20, height - 20) < 10) {
+
+  // ---- Data Mode Toggle (top-right corner) ----
+  float toggleX = width - 20;  // top-right
+  float toggleY = 20;
+  float toggleSize = 16;
+
+  if (dist(mouseX, mouseY, toggleX, toggleY) < toggleSize / 2) {
     useFakeData = !useFakeData;
     println("Data mode: " + (useFakeData ? "FAKE (randomInput)" : "REAL (readSerial)"));
   }
