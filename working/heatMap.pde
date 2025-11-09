@@ -30,6 +30,15 @@ float heatPanelHeight = 580;
 float rightPanelX = 600;
 float rightPanelWidth = 520;
 float rightColumnSpacing = 24;
+float gameButtonX = 0;
+float gameButtonY = 0;
+float gameButtonWidth = 160;
+float gameButtonHeight = 48;
+float gameButtonSpacing = 16;
+float view3DButtonX = 0;
+float view3DButtonY = 0;
+float view3DButtonWidth = 180;
+float view3DButtonHeight = 48;
 
 String fsrUnitAbbrev = "FSR";
 String fsrAxisLabel = "FSR units (0-1023)";
@@ -117,7 +126,7 @@ void heatMapDraw() {
   float motionBottom = drawMotionStatus();
   float barsBottom = drawBars(motionBottom + rightColumnSpacing);
   drawFSRGraphs(barsBottom + rightColumnSpacing);
-  drawResistanceToggle();
+  drawActionButtons();
 }
 
 // -------------------------
@@ -439,7 +448,7 @@ void detectMotion() {
 // -------------------------
 float drawMotionStatus() {
   float cardX = rightPanelX;
-  float cardY = 30;
+  float cardY = 20;
   float cardW = rightPanelWidth;
   float cardH = 100;  // ↓ shortened from 140 to make room for other tiles
   float radius = 22;
@@ -474,66 +483,76 @@ float drawMotionStatus() {
   return cardY + cardH;
 }
 
+boolean isPointInsideGameButton(float x, float y) {
+  return x >= gameButtonX && x <= gameButtonX + gameButtonWidth &&
+         y >= gameButtonY && y <= gameButtonY + gameButtonHeight;
+}
+
 
 
 // -------------------------
 // Toggle threshold UI (bottom-left corner)
 // -------------------------
-boolean highResistanceMode = false;
+void drawActionButtons() {
+  float baseY = height - view3DButtonHeight - 30;
+  view3DButtonX = heatPanelX + 30;
+  view3DButtonY = baseY;
 
-void drawResistanceToggle() {
-  float cardW = 220;
-  float cardH = 48;
-  float cardX = heatPanelX + 30;   // ⬅️ left side of heatmap panel
-  float cardY = height - cardH - 30;
-  float radius = 16;
+  drawViewIn3DButton(view3DButtonX, view3DButtonY, view3DButtonWidth, view3DButtonHeight);
 
-  // Background card (with soft shadow)
+  gameButtonY = baseY;
+  gameButtonX = view3DButtonX + view3DButtonWidth + gameButtonSpacing;
+  drawGameLaunchButton(gameButtonX, gameButtonY, gameButtonWidth, gameButtonHeight);
+}
+
+void drawViewIn3DButton(float x, float y, float w, float h) {
+  boolean hovered = isPointInsideView3DButton(mouseX, mouseY);
+  fill(hovered ? accentSecondary : accentPrimary);
   noStroke();
-  fill(0, 18);
-  rect(cardX, cardY + 5, cardW, cardH, radius);
-  fill(cardColor);
-  rect(cardX, cardY, cardW, cardH, radius);
+  rect(x, y, w, h, 18);
 
-  // Label + value
-  fill(mutedTextColor);
-  textSize(12);
+  fill(255);
+  textSize(14);
+  textAlign(CENTER, CENTER);
+  text("View in 3D", x + w / 2, y + h / 2);
   textAlign(LEFT);
-  text("Resistance Mode", cardX + 16, cardY + 18);
+}
 
-  fill(headingColor);
-  textSize(16);
-  text(highResistanceMode ? "High" : "Low", cardX + 16, cardY + 38);
+void drawGameLaunchButton(float startX, float startY, float width, float height) {
+  gameButtonX = startX;
+  gameButtonY = startY;
+  gameButtonWidth = width;
+  gameButtonHeight = height;
 
-  // Accent bar on right edge of button
+  boolean hovered = isPointInsideGameButton(mouseX, mouseY);
+  fill(hovered ? accentSecondary : accentPrimary);
   noStroke();
-  fill(highResistanceMode ? accentSecondary : accentPrimary);
-  rect(cardX + cardW - 12, cardY + 8, 6, cardH - 16, 3);
+  rect(gameButtonX, gameButtonY, gameButtonWidth, gameButtonHeight, 18);
 
-  // Threshold value text
-  textAlign(RIGHT);
-  fill(mutedTextColor);
-  textSize(11);
+  fill(255);
+  textSize(14);
+  textAlign(CENTER, CENTER);
+  text("Play Space Jumper", gameButtonX + gameButtonWidth / 2, gameButtonY + gameButtonHeight / 2);
   textAlign(LEFT);
+}
+
+boolean isPointInsideView3DButton(float x, float y) {
+  return x >= view3DButtonX && x <= view3DButtonX + view3DButtonWidth &&
+         y >= view3DButtonY && y <= view3DButtonY + view3DButtonHeight;
 }
 
 // Handle mouse click toggle
 void mousePressed() {
-  float cardW = 220;
-  float cardH = 48;
-  float cardX = heatPanelX + 30;   // same as drawResistanceToggle
-  float cardY = height - cardH - 30;
-
-  // ---- Resistance Mode Button (bottom-left) ----
-  if (mouseX > cardX && mouseX < cardX + cardW &&
-      mouseY > cardY && mouseY < cardY + cardH) {
-    highResistanceMode = !highResistanceMode;
-    stepThreshold = highResistanceMode ? 800 : 300;
-    println("Threshold mode switched → " + stepThreshold);
+  if (isPointInsideGameButton(mouseX, mouseY)) {
+    launchGameWindow();
+    return;
+  }
+  if (isPointInsideView3DButton(mouseX, mouseY)) {
+    launchFoot3DWindow();
+    return;
   }
 
-  // ---- Data Mode Toggle (top-right corner) ----
-  float toggleX = width - 20;  // top-right
+  float toggleX = width - 20;
   float toggleY = 20;
   float toggleSize = 16;
 
@@ -542,4 +561,3 @@ void mousePressed() {
     println("Data mode: " + (useFakeData ? "FAKE (randomInput)" : "REAL (readSerial)"));
   }
 }
-
