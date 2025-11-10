@@ -100,10 +100,14 @@ void randomInput() {
   // Add some noise
   float noiseScale = 50;
 
-  heel = int(700 + 200 * max(0, -stepPhase) + random(-noiseScale, noiseScale));
-  mf   = int(500 + 250 * max(0, stepPhase) + random(-noiseScale, noiseScale));
-  lf   = int(400 + 180 * max(0, stepPhase) + random(-noiseScale, noiseScale));
-  mm   = int(150 + 80  * abs(sin(t * 1.5)) + random(-noiseScale / 2, noiseScale / 2));
+  float heelActive = max(0, -stepPhase);
+  float toeActive = max(0, stepPhase);
+  float pressureBase = 40;
+
+  heel = int(constrain(pressureBase + heelActive * 900 + random(-noiseScale, noiseScale), 0, 1023));
+  lf   = int(constrain(pressureBase + toeActive * 900 + random(-noiseScale, noiseScale), 0, 1023));
+  mf   = int(constrain(pressureBase + (heelActive * 0.6 + toeActive * 0.4) * 900 + random(-noiseScale, noiseScale), 0, 1023));
+  mm   = int(constrain(pressureBase + abs(sin(t * 1.5)) * 200 + random(-noiseScale / 2, noiseScale / 2), 0, 1023));
 
   // Simulate accelerometer motion
   accelX = 0.05 * sin(t * 4) + random(-2, 2);

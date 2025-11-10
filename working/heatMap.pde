@@ -57,6 +57,11 @@ int stepCount = 0;
 float cadence = 0;
 float stepThreshold = 300;
 boolean stepDetected = false;
+long lastStepTimeMs = -1000;
+final long MIN_STEP_INTERVAL_MS = 250;
+final int STEP_HISTORY_SIZE = 12;
+float[] stepTimestamps = new float[STEP_HISTORY_SIZE];
+int stepTimestampCount = 0;
 
 // -------------------------
 // MFP calculation
@@ -336,16 +341,46 @@ void drawFSRGraphs(float startY) {
 // Step detection
 // -------------------------
 void detectStep() {
-  boolean active = (fsrValues[0] > stepThreshold || fsrValues[3] > stepThreshold);
+  float contact = max(fsrValues[0], fsrValues[3]);
+  boolean active = contact > stepThreshold;
+  long now = millis();
 
-  if (active && !stepDetected) {
-    stepCount++;
-    stepDetected = true;
-    float elapsedMinutes = (millis() / 60000.0);
-    if (elapsedMinutes > 0) cadence = stepCount / elapsedMinutes;
-  } else if (!active) {
+  if (active) {
+    if (!stepDetected && now - lastStepTimeMs >= MIN_STEP_INTERVAL_MS) {
+      stepDetected = true;
+      lastStepTimeMs = now;
+      recordStep(now);
+    }
+  } else {
     stepDetected = false;
   }
+
+  cadence = computeCadence();
+}
+
+void recordStep(long timestampMs) {
+  stepCount++;
+  addStepTimestamp(timestampMs);
+}
+
+void addStepTimestamp(long timestampMs) {
+  for (int i = STEP_HISTORY_SIZE - 1; i > 0; i--) {
+    stepTimestamps[i] = stepTimestamps[i - 1];
+  }
+  stepTimestamps[0] = timestampMs;
+  if (stepTimestampCount < STEP_HISTORY_SIZE) {
+    stepTimestampCount++;
+  }
+}
+
+float computeCadence() {
+  if (stepTimestampCount < 2) return 0;
+  float newest = stepTimestamps[0];
+  float oldest = stepTimestamps[stepTimestampCount - 1];
+  float durationSec = (newest - oldest) / 1000.0;
+  if (durationSec <= 0) return 0;
+  float intervals = stepTimestampCount - 1;
+  return (intervals / durationSec) * 60.0;
 }
 
 // -------------------------
@@ -357,16 +392,27 @@ void drawStepInfo() {
   float cardHeight = 90;
   float cardY = 30;
 
-  drawMetricCard(heatPanelX, cardY, cardWidth, cardHeight,
-                 "Step Count", str(stepCount), "total steps");
+  drawStepCadenceCard(heatPanelX, cardY, cardWidth, cardHeight);
 
-  String cadenceValue = nf(cadence, 1, 0);
-  drawMetricCard(heatPanelX + cardWidth + spacing, cardY, cardWidth, cardHeight,
-                 "Cadence", cadenceValue, "steps / min");
+  String gaitType = determineGaitType();
+  drawGaitCard(heatPanelX + cardWidth + spacing, cardY, cardWidth, cardHeight, gaitType);
 
   String mfpValue = nf(MFP, 1, 1) + "%";
   drawMetricCard(heatPanelX + 2 * (cardWidth + spacing), cardY, cardWidth, cardHeight,
                  "MFP", mfpValue, "forefoot load (%)");
+}
+
+void drawStepCadenceCard(float x, float y, float w, float h) {
+  drawCard(x, y, w, h, 18);
+  fill(mutedTextColor);
+  textSize(12);
+  text("STEP COUNT", x + 18, y + 24);
+  fill(headingColor);
+  textSize(30);
+  text(str(stepCount), x + 18, y + 60);
+  fill(mutedTextColor);
+  textSize(12);
+  text("Cadence: " + nf(cadence, 2, 1) + " steps / min", x + 18, y + h - 16);
 }
 
 void drawMetricCard(float x, float y, float w, float h, String label, String value, String helper) {
@@ -470,7 +516,7 @@ float drawMotionStatus() {
 
   fill(mutedTextColor);
   textSize(13);
-  text("Intensity: " + nf(currentSpeed, 1, 2) + " g", cardX + 28, cardY + 84);
+  //text("Intensity: " + nf(currentSpeed, 1, 2) + " g", cardX + 28, cardY + 84);
 
   textAlign(RIGHT);
   fill(headingColor);
@@ -534,6 +580,45 @@ void drawGameLaunchButton(float startX, float startY, float width, float height)
   textAlign(CENTER, CENTER);
   text("Play Space Jumper", gameButtonX + gameButtonWidth / 2, gameButtonY + gameButtonHeight / 2);
   textAlign(LEFT);
+}
+
+void drawGaitCard(float x, float y, float w, float h, String gaitType) {
+  drawCard(x, y, w, h, 18);
+  fill(mutedTextColor);
+  textSize(12);
+  text("Gait Type", x + 18, y + 24);
+
+  fill(headingColor);
+  textSize(24);
+  text(gaitType, x + 18, y + 54);
+
+  fill(mutedTextColor);
+  textSize(12);
+  text("Based on dominant FSR zone", x + 18, y + h - 16);
+}
+
+String determineGaitType() {
+  if (fsrValues == null || fsrValues.length == 0) {
+    return "Unknown";
+  }
+  int maxIndex = 0;
+  for (int i = 1; i < fsrValues.length; i++) {
+    if (fsrValues[i] > fsrValues[maxIndex]) {
+      maxIndex = i;
+    }
+  }
+
+  switch (maxIndex) {
+    case 3:
+      return "Normal";
+    case 1:
+      return "In Toe";
+    case 0:
+    case 2:
+      return "Out Toe";
+    default:
+      return "Normal";
+  }
 }
 
 boolean isPointInsideView3DButton(float x, float y) {
