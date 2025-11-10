@@ -65,9 +65,9 @@ void readSerial() {
 
   try {
     heel    = int(tokens[0]);
-    mf      = int(tokens[1]);
-    mm      = int(tokens[2]);
-    lf      = int(tokens[3]);
+    mf      = int(tokens[3]);
+    mm      = int(tokens[1]);
+    lf      = int(tokens[2]);
     accelX  = float(tokens[4]);
     accelY  = float(tokens[5]);
     accelZ  = float(tokens[6]);
