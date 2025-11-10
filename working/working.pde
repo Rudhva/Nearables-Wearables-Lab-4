@@ -1,5 +1,6 @@
-import processing.core.PApplet;
-
+// -------------------------
+// Main sketch
+// -------------------------
 GameSketch activeGame = null;
 Foot3DSketch activeFoot = null;
 
@@ -8,14 +9,16 @@ interface SketchWindowListener {
 }
 
 void setup() {
-  size(1200, 825);
-  heatMapSetup();
-  setupSerial();
+  size(1200, 825, P3D);
+  frameRate(60);
+
+  heatMapSetup();       // existing function
+  setupSerial();        // serial initialization
 }
 
 void draw() {
   background(255);
-  heatMapDraw();
+  heatMapDraw();        // existing function
 
   fill(useFakeData ? color(254, 157, 74) : color(82, 126, 255));
   noStroke();
@@ -23,6 +26,15 @@ void draw() {
 
   if (useFakeData) randomInput();
   else readSerial();
+
+  // Pass latest sensor values to 3D foot if it's active
+  if (activeFoot != null) {
+    activeFoot.updateSensorValues(
+      accelX, accelY, accelZ,
+      fsrValues,
+      latestSerialMessage
+    );
+  }
 }
 
 void launchGameWindow() {

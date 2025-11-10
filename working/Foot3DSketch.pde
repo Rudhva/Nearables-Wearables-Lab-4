@@ -1,4 +1,3 @@
-import processing.serial.*;
 import processing.core.PApplet;
 import processing.core.PShape;
 
@@ -6,24 +5,23 @@ class Foot3DSketch extends PApplet {
   final PApplet parent;
   SketchWindowListener listener;
 
-  Serial myPort;
-  int SERIAL_PORT_INDEX = -1;
-
-  float accelX = 0, accelY = 0, accelZ = 0;
-  int heel, mf, mm, lf;
-  int[] fsrValues = new int[4];
+  // --- Live sensor data ---
+  float accelX, accelY, accelZ;
+  int[] fsrValues = new int[4];  // 0=big toe, 1=ball, 2=midfoot, 3=heel
   String latestSerialMessage = "";
 
-  float rotX = 0, rotY = 0, rotZ = 0;
-  float smoothRotation = 0.1f;
+  // --- 3D rotation ---
+  float rotX = 0, rotY = 0;
+  float smoothRotation = 0.15f;
 
-  float baseAccelX = 0;
-  float baseAccelY = 0;
-  float baseAccelZ = 0;
+  // --- Calibration ---
+  float baseAccelX = 0, baseAccelY = 0, baseAccelZ = 0;
   boolean calibrated = false;
 
+  // --- 3D foot model ---
   PShape foot;
 
+  // --- UI ---
   float navHeight = 60;
   float navButtonHeight = 32;
   float navButtonMargin = 14;
@@ -50,13 +48,11 @@ class Foot3DSketch extends PApplet {
     navButtonColor = color(82, 126, 255);
     quitButtonColor = color(244, 114, 117);
 
-    setupSerial();
-
+    // Load 3D model
     foot = loadAssetShape("foot.obj");
     if (foot == null) {
-      println("⚠️ Could not find foot.obj inside data/ – ensure the file is present.");
+      println("⚠️ foot.obj missing in data/");
       exit();
-      return;
     }
     foot.scale(35);
     foot.rotateX(HALF_PI);
@@ -65,23 +61,78 @@ class Foot3DSketch extends PApplet {
   public void draw() {
     background(12);
     lights();
-    ambientLight(60, 60, 60);
+    ambientLight(80, 80, 80);
     directionalLight(255, 220, 200, -0.3f, 0.4f, -1);
-    pointLight(255, 180, 160, width/2, height/2, 400);
 
+    // Update foot orientation
     updateRotationFromAccel();
 
+    // --- Draw foot ---
+    pushMatrix();
     translate(width/2, height/1.6f, -400);
     rotateX(rotX);
     rotateY(rotY);
-    rotateZ(rotZ);
-
     fill(242, 198, 158);
+    noStroke();
     shape(foot);
+
+    drawPressurePoints();
+    popMatrix();
 
     drawHUD();
     drawNavBar();
   }
+
+  // --- Called by parent sketch with real sensor data ---
+  public void updateSensorValues(float ax, float ay, float az, float[] fsr, String msg) {
+  this.accelX = ax;
+  this.accelY = ay;
+  this.accelZ = az;
+  if (fsr != null && fsr.length == 4) {
+    for (int i = 0; i < 4; i++) fsrValues[i] = (int)fsr[i];  // convert to int
+  }
+  this.latestSerialMessage = msg;
+}
+
+void drawPressurePoints() {
+  pushStyle();
+
+  // Corrected offsets for right foot bottom view
+  // Format: {x (left-right), y (up-down), z (front-back)}
+  float[][] offsets = {
+    { 70, -10, -50 },   //LATERAL
+    { 20, -10, -150 }, //BIG TOE
+    { -20, -10, -30 },     // MIDFOOT
+    { 0, -10, 140 }       // HEEL
+  };
+
+  float sphereBaseSize = 18;
+
+  colorMode(HSB, 255);
+
+  for (int i = 0; i < 4; i++) {
+    float intensity = constrain(map(fsrValues[i], 0, 1023, 50, 255), 50, 255);
+    float radius = map(fsrValues[i], 0, 1023, sphereBaseSize, sphereBaseSize * 2.5f);
+
+    int c;
+    if (fsrValues[i] < 512) c = color(180, 255, intensity);      // blue
+    else if (fsrValues[i] < 768) c = color(60, 255, intensity);  // yellow
+    else c = color(0, 255, intensity);                            // red
+
+    fill(c, 200);
+    noStroke();
+
+    pushMatrix();
+    translate(offsets[i][0], offsets[i][1], offsets[i][2]);
+    sphere(radius);
+    popMatrix();
+  }
+
+  popStyle();
+}
+
+
+
 
   void drawHUD() {
     camera();
@@ -89,38 +140,42 @@ class Foot3DSketch extends PApplet {
     fill(255);
     textSize(14);
     textAlign(LEFT);
-    text("AccelX: " + nf(accelX, 1, 2)
-       + "  AccelY: " + nf(accelY, 1, 2)
-       + "  AccelZ: " + nf(accelZ, 1, 2), 12, height - 30);
-    text("Latest packet: " + latestSerialMessage, 12, height - 10);
-    if (calibrated) {
-      text("✅ Calibrated (press C to recalibrate)", 12, height - 50);
-    } else {
-      text("Press C to calibrate baseline", 12, height - 50);
-    }
+
+    text("FSR: " + fsrValues[0] + ", " + fsrValues[1] + ", " + fsrValues[2] + ", " + fsrValues[3],
+         12, height - 70);
+
+    text("AccelX: " + nf(accelX, 1, 2) +
+         "  AccelY: " + nf(accelY, 1, 2) +
+         "  AccelZ: " + nf(accelZ, 1, 2), 12, height - 50);
+
+    text("Latest packet: " + latestSerialMessage, 12, height - 30);
+
+    text(calibrated ? "✅ Calibrated (press C to recalibrate)"
+                    : "Press C to calibrate baseline", 12, height - 10);
+
     hint(ENABLE_DEPTH_TEST);
   }
 
   void drawNavBar() {
+    camera();
+    hint(DISABLE_DEPTH_TEST);
     noStroke();
-    fill(255, 225);
+    fill(255, 235);
     rect(0, 0, width, navHeight);
 
     backBtnX = navButtonMargin;
     backBtnY = navButtonMargin;
-    backBtnH = navButtonHeight;
-    quitBtnH = navButtonHeight;
     quitBtnX = width - navButtonMargin - quitBtnW;
     quitBtnY = navButtonMargin;
 
-    drawNavButton(backBtnX, backBtnY, backBtnW, backBtnH, "Back to dashboard", navButtonColor);
-    drawNavButton(quitBtnX, quitBtnY, quitBtnW, quitBtnH, "Quit app", quitButtonColor);
+    drawNavButton(backBtnX, backBtnY, backBtnW, backBtnH, "Back to Dashboard", navButtonColor);
+    drawNavButton(quitBtnX, quitBtnY, quitBtnW, quitBtnH, "Quit App", quitButtonColor);
 
     fill(20, 160);
     textSize(18);
     textAlign(CENTER, CENTER);
     text("Foot 3D Viewer", width / 2, navHeight / 2);
-    textAlign(LEFT, BASELINE);
+    hint(ENABLE_DEPTH_TEST);
   }
 
   void drawNavButton(float x, float y, float w, float h, String label, int btnColor) {
@@ -130,46 +185,30 @@ class Foot3DSketch extends PApplet {
     textSize(13);
     textAlign(CENTER, CENTER);
     text(label, x + w / 2, y + h / 2);
-    textAlign(LEFT, BASELINE);
   }
 
   void mousePressed() {
     if (pointInRect(mouseX, mouseY, backBtnX, backBtnY, backBtnW, backBtnH)) {
-      closeToDashboard();
+      if (listener != null) listener.onWindowClosed();
+      surface.stopThread();
+      dispose();
       return;
     }
     if (pointInRect(mouseX, mouseY, quitBtnX, quitBtnY, quitBtnW, quitBtnH)) {
-      quitApp();
-      return;
+      if (parent != null) parent.exit();
+      exit();
     }
   }
 
   void keyPressed() {
-    if ((key == 'c' || key == 'C')) {
+    if (key == 'c' || key == 'C') {
       baseAccelX = accelX;
       baseAccelY = accelY;
       baseAccelZ = accelZ;
       calibrated = true;
-      println("✅ Calibration complete: " + baseAccelX + ", " + baseAccelY + ", " + baseAccelZ);
+      println("✅ Calibrated baseline: " + baseAccelX + ", " + baseAccelY + ", " + baseAccelZ);
     }
-    if (key == ESC) {
-      key = 0;
-    }
-  }
-
-  void closeToDashboard() {
-    exit();
-  }
-
-  void quitApp() {
-    if (parent != null) {
-      parent.exit();
-    }
-    exit();
-  }
-
-  boolean pointInRect(float px, float py, float rx, float ry, float rw, float rh) {
-    return px >= rx && px <= rx + rw && py >= ry && py <= ry + rh;
+    if (key == ESC) key = 0;
   }
 
   void updateRotationFromAccel() {
@@ -184,80 +223,23 @@ class Foot3DSketch extends PApplet {
     rotY = lerp(rotY, tiltY, smoothRotation);
   }
 
-  void setupSerial() {
-    println("Serial ports available:");
-    String[] ports = Serial.list();
-    for (int i = 0; i < ports.length; i++) {
-      println("  [" + i + "] " + ports[i]);
-    }
-    if (ports.length == 0) {
-      println("No serial ports detected.");
-      return;
-    }
-    String chosen;
-    if (SERIAL_PORT_INDEX >= 0 && SERIAL_PORT_INDEX < ports.length) {
-      chosen = ports[SERIAL_PORT_INDEX];
-    } else {
-      chosen = ports[ports.length - 1];
-    }
-
-    println("Opening serial on " + chosen + " at 115200...");
-    try {
-      myPort = new Serial(this, chosen, 115200);
-      myPort.bufferUntil('\n');
-      println("✅ Serial opened successfully.");
-    } catch (Exception e) {
-      println("❌ Failed to open serial: " + e.getMessage());
-    }
-  }
-
   PShape loadAssetShape(String filename) {
-    PShape loaded = null;
-    if (parent != null) {
-      loaded = parent.loadShape(filename);
+    PShape s = null;
+    if (parent != null) s = parent.loadShape(filename);
+    if (s == null) {
+      String path = parent != null ? parent.dataPath(filename) : dataPath(filename);
+      s = loadShape(path);
+      if (s == null) println("⚠️ Failed to load shape " + filename + " from " + path);
     }
-    if (loaded == null) {
-      String assetPath = parent != null ? parent.dataPath(filename) : dataPath(filename);
-      loaded = loadShape(assetPath);
-      if (loaded == null) {
-        println("⚠️ Failed to load shape " + filename + " from " + assetPath);
-      }
-    }
-    return loaded;
+    return s;
   }
 
-  void serialEvent(Serial p) {
-    String line = trim(p.readStringUntil('\n'));
-    if (line == null || line.length() == 0) return;
-    if (!line.matches("^[0-9,\\-\\.]+$")) return;
-    String[] tokens = split(line, ',');
-    if (tokens.length != 10) return;
-
-    try {
-      heel = int(tokens[0]);
-      mf = int(tokens[1]);
-      mm = int(tokens[2]);
-      lf = int(tokens[3]);
-      accelX = float(tokens[4]);
-      accelY = float(tokens[5]);
-      accelZ = float(tokens[6]);
-      latestSerialMessage = line;
-    } catch (Exception e) {
-      println("⚠️ Parse error: " + e.getMessage());
-      return;
-    }
-
-    fsrValues[0] = lf;
-    fsrValues[1] = mf;
-    fsrValues[2] = mm;
-    fsrValues[3] = heel - 10;
+  boolean pointInRect(float px, float py, float rx, float ry, float rw, float rh) {
+    return px >= rx && px <= rx + rw && py >= ry && py <= ry + rh;
   }
 
   public void exit() {
-    if (listener != null) {
-      listener.onWindowClosed();
-      listener = null;
-    }
+    if (listener != null) listener.onWindowClosed();
     super.exit();
   }
 }

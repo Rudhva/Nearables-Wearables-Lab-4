@@ -598,28 +598,48 @@ void drawGaitCard(float x, float y, float w, float h, String gaitType) {
 }
 
 String determineGaitType() {
-  if (fsrValues == null || fsrValues.length == 0) {
-    return "Unknown";
-  }
-  int maxIndex = 0;
-  for (int i = 1; i < fsrValues.length; i++) {
-    if (fsrValues[i] > fsrValues[maxIndex]) {
-      maxIndex = i;
-    }
-  }
+  if (fsrValues == null || fsrValues.length < 4) return "Unknown";
 
-  switch (maxIndex) {
-    case 3:
-      return "Normal";
-    case 1:
-      return "In Toe";
-    case 0:
-    case 2:
-      return "Out Toe";
-    default:
-      return "Normal";
+  // Assign meaning to sensors
+  float lf   = fsrValues[0];  // Lateral Forefoot (Big Toe side)
+  float mf   = fsrValues[1];  // Medial Forefoot
+  float mm   = fsrValues[2];  // Medial Midfoot
+  float heel = fsrValues[3];  // Heel
+
+  // Compute total force to normalize
+  float total = lf + mf + mm + heel + 0.001;
+
+  // --- Calculate Medial Force Percentage (MFP) ---
+  float MFP = ((mm + mf) * 100.0) / total;
+
+  // --- Optional: compute region percentages for context ---
+  float heelPct = heel / total;
+  float forePct = (lf + mf) / total;
+  float midPct  = mm / total;
+
+  // --- Classify gait based on MFP and force distribution ---
+  if (MFP > 55) {
+    return "In-Toeing";          // more pressure on medial side
+  }
+  else if (MFP < 35 && heelPct > 0.4) {
+    return "Heel Walking";       // mostly heel contact, low medial load
+  }
+  else if (MFP < 35 && forePct > 0.4) {
+    return "Out-Toeing";         // lateral side dominant
+  }
+  else if (forePct > 0.6 && heelPct < 0.25) {
+    return "Tiptoeing";          // forefoot only
+  }
+  else if (MFP >= 40 && MFP <= 50) {
+    return "Normal Gait";        // balanced medial-lateral
+  }
+  else {
+    return "Flat Footed / Transitional"; // fallback
   }
 }
+
+
+
 
 boolean isPointInsideView3DButton(float x, float y) {
   return x >= view3DButtonX && x <= view3DButtonX + view3DButtonWidth &&
