@@ -1,9 +1,8 @@
-
 // -------------------------
 // serial.pde (Processing)
 // -------------------------
 import processing.serial.*;
-
+boolean useFakeData = false;
 
 final int SERIAL_PORT_INDEX = 7; 
 
@@ -63,7 +62,7 @@ void readSerial() {
     return;
   }
 
-  try {
+  try { 
     heel    = int(tokens[0]);
     mf      = int(tokens[3]);
     mm      = int(tokens[1]);
@@ -85,4 +84,44 @@ void readSerial() {
   fsrValues[1] = mf;   // Ball
   fsrValues[2] = mm;   // Midfoot
   fsrValues[3] = heel - 10;
+}
+
+
+
+// -------------------------
+// Random realistic fallback
+// -------------------------
+void randomInput() {
+  // simulate foot pressure pattern: heel + ball dominant, midfoot low
+  float t = millis() / 1000.0;
+  float stepPhase = sin(t * 2.0); // smooth walking rhythm
+
+  // Add some noise
+  float noiseScale = 50;
+
+  float heelActive = max(0, -stepPhase);
+  float toeActive = max(0, stepPhase);
+  float pressureBase = 40;
+
+  heel = int(constrain(pressureBase + heelActive * 900 + random(-noiseScale, noiseScale), 0, 1023));
+  lf   = int(constrain(pressureBase + toeActive * 900 + random(-noiseScale, noiseScale), 0, 1023));
+  mf   = int(constrain(pressureBase + (heelActive * 0.6 + toeActive * 0.4) * 900 + random(-noiseScale, noiseScale), 0, 1023));
+  mm   = int(constrain(pressureBase + abs(sin(t * 1.5)) * 200 + random(-noiseScale / 2, noiseScale / 2), 0, 1023));
+
+  // Simulate accelerometer motion
+  accelX = 0.05 * sin(t * 4) + random(-2, 2);
+  accelY = 0.07 * cos(t * 3) + random(-0.02, 0.02);
+  accelZ = 1.0 + 0.05 * sin(t * 2) + random(-0.02, 0.02); // around 1g
+
+  // Gyro values fluctuate slightly
+  gyroX = random(-5, 5);
+  gyroY = random(-5, 5);
+  gyroZ = random(-5, 5);
+
+  fsrValues[0] = lf;
+  fsrValues[1] = mf;
+  fsrValues[2] = mm;
+  fsrValues[3] = heel - 10;
+
+  latestSerialMessage = nf(heel, 1, 0) + "," + nf(mf, 1, 0) + "," + nf(mm, 1, 0) + "," + nf(lf, 1, 0);
 }
