@@ -594,7 +594,7 @@ void drawGaitCard(float x, float y, float w, float h, String gaitType) {
 
   fill(mutedTextColor);
   textSize(12);
-  text("Based on dominant FSR zone", x + 18, y + h - 16);
+\
 }
 
 String determineGaitType() {
@@ -634,7 +634,7 @@ String determineGaitType() {
     return "Normal Gait";        // balanced medial-lateral
   }
   else {
-    return "Flat Footed / Transitional"; // fallback
+        return "Normal Gait";        // balanced medial-lateral
   }
 }
 
