@@ -26,7 +26,7 @@ class GameSketch extends PApplet {
 
   float totalPressure = 0;
   boolean jumpTriggered = false;
-  float jumpThreshold = 500;
+  float jumpThreshold = 1000;
 
   ArrayList<PVector> clouds;
   float cloudSpeed = 1;
